@@ -1,3 +1,6 @@
+#ifndef LSP_H
+#define LSP_H
+
 typedef enum {
 	OT_CONS,
 	OT_INT,
@@ -12,7 +15,7 @@ struct object_t;
 
 typedef struct object_t *(Primitive)(struct object_t *args);
 
-struct object_t {
+typedef struct object_t {
 	ObjectType type;
 	union {
 		struct {
@@ -23,15 +26,25 @@ struct object_t {
 		char *name;
 		Primitive *function;
 	};
-};
+} Object;
 
-struct env_t {
-	struct object_t *vars; 
-	struct env_t *up;
-};
+typedef struct hash_table_list_t {
+	char *name;
+	Object *object;
+	struct hash_table_list_t *next;
+} HashTableList;
 
-typedef struct object_t Object;
-typedef struct env_t Env;
+typedef struct hash_table_t {
+	int size;
+	HashTableList **table;
+} HashTable;
 
+HashTable *env_init();
 Object *read();
-Object *eval(Object *);
+Object *eval(HashTable *, Object *);
+
+HashTable *ht_create(int);
+int ht_insert(HashTable *, char *, Object *);
+Object *ht_lookup(HashTable *, char *);
+
+#endif

@@ -1,2 +1,2 @@
 all:
-	gcc -o lsp {main,core}.c
+	gcc -o lsp {main,core,hashtable}.c

@@ -30,8 +30,8 @@ static Object *cons(Object *car, Object *cdr) {
 	return o;
 }
 
-static void err(char *msg) {
-	printf("ERROR: %s\n", msg);
+static void err(char *msg, ...) {
+	printf("%s\n", msg);
 	exit(1);
 }
 
@@ -122,22 +122,30 @@ static Object *read_list() {
 
 static Object* apply(Object *, Object*);
 
-Object *eval(Object *o) {
+Object *eval(HashTable *env, Object *o) {
 	switch (o->type) {
 		case OT_INT:
 		case OT_TRUE:
 		case OT_NIL:
 			return o;
 		case OT_CONS: {
-			Object *fn = o->car;	
+			Object *fn = eval(env, o->car);
 			Object *args = o->cdr;
 			if (fn->type != OT_PRIMITIVE && fn->type != OT_FUNCTION) {
 				err("The first element of list must be a function");
 			}
-			if (fn->type != OT_NIL && fn->type != OT_CONS) {
+			if (args->type != OT_NIL && args->type != OT_CONS) {
 				err("Function argument must be a list");
 			}
 			return apply(fn, args);
+		}
+		case OT_SYMBOL: {
+			Object *found = ht_lookup(env, o->name);
+			if (found == NULL) {
+				printf("Undefined symbol: %s\n", o->name);
+				exit(1);
+			}
+			return found;
 		}
 		default:
 			return NULL;
@@ -149,4 +157,34 @@ Object* apply(Object* fn, Object *args) {
 		return fn->function(args);
 	}
 	return NULL;
+}
+
+/**
+ * Environment
+ */
+
+static Object *primitive_plus(Object *list);
+
+static void add_primitive(HashTable *env, char *name, Primitive *fn) {
+	Object *o = new_object(OT_PRIMITIVE);
+	o->function = fn;
+	ht_insert(env, name, o);
+}
+
+HashTable *env_init() {
+	HashTable *env = ht_create(128);
+	add_primitive(env, "plus", primitive_plus);
+	return env;
+}
+
+static Object *primitive_plus(Object *list) {
+	int sum = 0;
+	for (Object *args = list; args != Nil; args = args->cdr) {
+		if (args->car->type != OT_INT)
+			err("+ accepts only ints");
+		sum += args->car->value;
+	}
+	Object *o = new_object(OT_INT);
+	o->value = sum;
+	return o;
 }
