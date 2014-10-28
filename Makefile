@@ -1,2 +1,2 @@
 all:
-	gcc -o lsp lsp.c parser.c
+	gcc -o lsp {main,core}.c
