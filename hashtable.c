@@ -1,9 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include "lsp.h"
-
-
-#include <stdio.h>
+#include "hashtable.h"
 
 /**
  * @see http://www.cse.yorku.ca/~oz/hash.html
@@ -26,23 +23,23 @@ HashTable *ht_create(int size) {
 	return ht;
 }
 
-int ht_insert(HashTable *ht, char *name, Object *o) {
+int ht_insert(HashTable *ht, char *name, void *data) {
 	unsigned long index;
 	if (ht_lookup(ht, name) != NULL)
 		return 1;
 	index = hash(name, ht->size); 
 	HashTableList *new = (HashTableList *) malloc(sizeof(HashTableList));
 	new->name = strdup(name);
-	new->object = o;
+	new->data = data;
 	new->next = ht->table[index];
 	ht->table[index] = new;
 	return 0;
 }
 
-Object *ht_lookup(HashTable *ht, char *name) {
+HashTableList *ht_lookup(HashTable *ht, char *name) {
 	HashTableList *list;
 	for (list = ht->table[hash(name, ht->size)]; list != NULL; list = list->next)
 		if (strcmp(name, list->name) == 0)
-			return list->object;
+			return list;
 	return NULL;
 }

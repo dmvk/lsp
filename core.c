@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "lsp.h"
+
+#include "core.h"
 
 #define SYMBOL_MAX_LENGTH 128
 
@@ -10,8 +11,8 @@
  * PREDEFINED ATOMS
  */
 
-static Object *True = &(Object) { OT_TRUE };
-static Object *Nil = &(Object) { OT_NIL };
+Object *True = &(Object) { OT_TRUE };
+Object *Nil = &(Object) { OT_NIL };
 
 /**
  * HELPERS
@@ -140,12 +141,12 @@ Object *eval(HashTable *env, Object *o) {
 			return apply(fn, args);
 		}
 		case OT_SYMBOL: {
-			Object *found = ht_lookup(env, o->name);
-			if (found == NULL) {
+			HashTableList *list = ht_lookup(env, o->name);
+			if (list == NULL) {
 				printf("Undefined symbol: %s\n", o->name);
 				exit(1);
 			}
-			return found;
+			return list->data;;
 		}
 		default:
 			return NULL;
@@ -157,6 +158,38 @@ Object* apply(Object* fn, Object *args) {
 		return fn->function(args);
 	}
 	return NULL;
+}
+
+/**
+ * Print
+ */
+
+void print(Object *o) {
+	if (o == NULL)
+		printf("NULL");
+	switch(o->type) {
+		case OT_INT:
+			printf("%d", o->value);
+			break;
+		case OT_SYMBOL:
+			printf("%s", o->name);
+			break;
+		case OT_CONS:
+			printf("(");
+			print(o->car);
+			print(o->cdr);
+			printf(")");
+			break;
+		case OT_NIL:
+			printf("Nil");
+			break;
+		case OT_PRIMITIVE:
+			printf("<primitive>");
+			break;
+		default:
+			printf("unhandled");
+	}
+	printf(" ");
 }
 
 /**

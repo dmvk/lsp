@@ -1,5 +1,11 @@
-#ifndef LSP_H
-#define LSP_H
+#ifndef CORE_H 
+#define CORE_H 
+
+#include "hashtable.h"
+
+/**
+ * LIST STRUCTURED MEMORY
+ */
 
 typedef enum {
 	OT_CONS,
@@ -28,23 +34,20 @@ typedef struct object_t {
 	};
 } Object;
 
-typedef struct hash_table_list_t {
-	char *name;
-	Object *object;
-	struct hash_table_list_t *next;
-} HashTableList;
-
-typedef struct hash_table_t {
-	int size;
-	HashTableList **table;
-} HashTable;
+/**
+ * INTERFACE
+ */
 
 HashTable *env_init();
 Object *read();
 Object *eval(HashTable *, Object *);
+void print(Object *);
 
-HashTable *ht_create(int);
-int ht_insert(HashTable *, char *, Object *);
-Object *ht_lookup(HashTable *, char *);
+/**
+ * PREDEFINED ATOMS
+ */
+
+extern Object *True;
+extern Object *Nil;
 
 #endif
