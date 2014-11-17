@@ -278,6 +278,24 @@ static Object *create_function(Object *params, Object *body) {
 	return fn;
 }
 
+static Object *primitive_and(Env *env, Object *args) {
+	for (; args != Nil; args = args->cdr) {
+		if (eval(env, args->car) == Nil) {
+			return Nil;
+		}
+	}
+	return True;
+}
+
+static Object *primitive_or(Env *env, Object *args) {
+	for (; args != Nil; args = args->cdr) {
+		if (eval(env, args->car) != Nil) {
+			return True;
+		}
+	}
+	return Nil;
+}
+
 static Object *primitive_car(Env *env, Object *args) {
 	args = eval_args(env, args);
 	if (args->car->type != OT_CONS || args->cdr != Nil) {
@@ -383,6 +401,14 @@ static Object *primitive_minus(Env *env, Object *args) {
 	return o;
 }
 
+static Object *primitive_obj_eq(Env *env, Object *args) {
+	if (count(args) != 2) {
+		err("eq accepts two arguments only");
+	}
+	args = eval_args(env, args);
+	return args->car == args->cdr->car ? True : Nil;
+}
+
 static Object *primitive_plus(Env *env, Object *args) {
 	int sum = 0;
 	for (args = eval_args(env, args); args != Nil; args = args->cdr) {
@@ -407,6 +433,15 @@ static Object *primitive_println(Env *env, Object *args) {
 
 static Object *primitive_progn(Env *env, Object *args) {
 	return progn(env, args);
+}
+
+static Object *primitive_setcar(Env *env, Object *args) {
+	args = eval_args(env, args);
+	if (count(args) != 2 || args->car->type != OT_CONS) {
+		err ("setcar accepts two arguments only, with first being a cons cell");
+	}
+	args->car->car = args->cdr->car;
+	return args->car;
 }
 
 static Object *primitive_quote(Env *env, Object *args) {
@@ -457,6 +492,7 @@ Env *env_init() {
 	Env *env = env_create();
 	ht_insert(env->ht, "Nil", Nil);
 	ht_insert(env->ht, "True", True);
+	add_primitive(env, "and", primitive_and);
 	add_primitive(env, "car", primitive_car);
 	add_primitive(env, "cdr", primitive_cdr);
 	add_primitive(env, "cons", primitive_cons);
@@ -468,9 +504,12 @@ Env *env_init() {
 	add_primitive(env, "<", primitive_lt);
 	add_primitive(env, "lambda", primitive_lambda);
 	add_primitive(env, "-", primitive_minus);
+	add_primitive(env, "eq", primitive_obj_eq);
+	add_primitive(env, "or", primitive_or);
 	add_primitive(env, "+", primitive_plus);
 	add_primitive(env, "println", primitive_println);
 	add_primitive(env, "progn", primitive_progn);
+	add_primitive(env, "setcar", primitive_setcar);
 	add_primitive(env, "quote", primitive_quote);
 	add_primitive(env, "while", primitive_while);
 	return env;
