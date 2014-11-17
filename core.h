@@ -40,6 +40,10 @@ typedef struct object_t {
 		int value;
 		char *name;
 		Primitive *function;
+		struct {
+			struct object_t *params;
+			struct object_t *body;
+		};
 	};
 } Object;
 

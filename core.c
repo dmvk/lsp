@@ -7,7 +7,7 @@
 
 #define SYMBOL_MAX_LENGTH 128
 
-const char symbol_special_chars[] = "+-"; // todo
+const char symbol_special_chars[] = "+-_"; // todo
 
 /**
  * PREDEFINED ATOMS
@@ -62,6 +62,9 @@ Object *read() {
 		if (isspace(c)) {
 			continue;
 		}
+		if (c == EOF) {
+			return NULL;
+		}
 		if (isdigit(c)) {
 			ungetc(c, stdin);
 			return read_number();
@@ -79,9 +82,6 @@ Object *read() {
 		if (c == '\'') {
 			return read_quote();
 		}
-		if (c == EOF) {
-			return NULL;
-		}
 		err("Syntax error\n");
 	}
 }
@@ -95,8 +95,8 @@ static int peek() {
 }
 
 static Object *read_number(int isPositive) {
-	int v = 0; 
-	while (isdigit(peek())) 
+	int v = 0;
+	while (isdigit(peek()))
 		v = v * 10 + (getchar() - '0');
 	Object *o = new_object(OT_INT);
 	o->value = isPositive ? v : -v;
@@ -110,7 +110,7 @@ static Object *read_symbol() {
 		if (i >= SYMBOL_MAX_LENGTH) {
 			err("Symbol name is too long");
 		}
-		buf[i++] = getchar(); 
+		buf[i++] = getchar();
 	}
 	buf[i] = '\0';
 	Object *o = new_object(OT_SYMBOL);
@@ -150,11 +150,17 @@ static Object *read_quote() {
  */
 
 static Object *apply(Env *, Object *, Object*);
+static Env *env_create();
 static Object *env_lookup(Env *env, char *name);
+static Object *progn(Env *, Object *);
 
 Object *eval(Env *env, Object *o) {
+	if (o == NULL) {
+		return NULL;
+	}
 	switch (o->type) {
 		case OT_INT:
+		case OT_FUNCTION:
 		case OT_TRUE:
 		case OT_NIL:
 			return o;
@@ -190,9 +196,27 @@ static Object *eval_args(Env *env, Object *o) {
 	return first;
 }
 
+static Object *progn(Env *env, Object *args) {
+	Object *last;
+	for (; args != Nil; args = args->cdr) {
+		last = eval(env, args->car);
+	}
+	return last;
+}
+
 static Object *apply(Env *env, Object* o, Object *args) {
 	if (o->type == OT_PRIMITIVE) {
 		return o->function(env, args);
+	}
+	if (o->type == OT_FUNCTION) {
+		Object *params = o->params;
+		args = eval_args(env, args);
+		Env *env_child = env_create();
+		env_child->parent = env;
+		for (; params->type == OT_CONS; params = params->cdr, args = args->cdr) {
+			ht_insert(env_child->ht, params->car->name, args->car);
+		}
+		return progn(env_child, o->body);
 	}
 	return NULL;
 }
@@ -202,8 +226,6 @@ static Object *apply(Env *env, Object* o, Object *args) {
  */
 
 void print(Object *o) {
-	if (o == NULL)
-		printf("NULL");
 	switch(o->type) {
 		case OT_INT:
 			printf("%d", o->value);
@@ -213,25 +235,48 @@ void print(Object *o) {
 			break;
 		case OT_CONS:
 			printf("(");
-			print(o->car);
-			print(o->cdr);
+			for (;;) {
+				print(o->car);
+				if (o->cdr == Nil) {
+					break;
+				}
+				printf(" ");
+				o = o->cdr;
+			}
 			printf(")");
 			break;
 		case OT_NIL:
 			printf("Nil");
 			break;
+		case OT_TRUE:
+			printf("True");
+			break;
 		case OT_PRIMITIVE:
 			printf("<primitive>");
+			break;
+		case OT_FUNCTION:
+			printf("<function>");
 			break;
 		default:
 			printf("unhandled");
 	}
-	printf(" ");
 }
 
 /**
- * Primitives 
+ * Primitives
  */
+
+static Object *create_function(Object *params, Object *body) {
+	for (Object *p = params; p->type == OT_CONS; p = p->cdr) {
+		if (p->car->type != OT_SYMBOL) {
+			err("function parameter must be a symbol");
+		}
+	}
+	Object *fn = new_object(OT_FUNCTION);
+	fn->params = params;
+	fn->body = body;
+	return fn;
+}
 
 static Object *primitive_car(Env *env, Object *args) {
 	args = eval_args(env, args);
@@ -258,6 +303,30 @@ static Object *primitive_cons(Env *env, Object *args) {
 	return args;
 }
 
+static Object *primitive_define(Env *env, Object *args) {
+	if (count(args) != 2 || args->car->type != OT_SYMBOL) {
+		err("define accepts two arguments only, with first one being a symbol");
+	}
+	Object *value = eval(env, args->cdr->car);
+	ht_insert(env->ht, args->car->name, value);
+	return value;
+}
+
+static Object *primitive_if(Env *env, Object *args) {
+	int cnt = count(args);
+	if (cnt != 2 && cnt != 3) {
+		err("if needs two or three arguments");
+	}
+	if (eval(env, args->car) != Nil) {
+		return eval(env, args->cdr->car);
+	}
+	return cnt == 2 ? Nil : eval(env, args->cdr->cdr->car);
+}
+
+static Object *primitive_lambda(Env *env, Object *args) {
+	return create_function(args->car, args->cdr);
+}
+
 static Object *primitive_minus(Env *env, Object *args) {
 	int diff;
 	int first = 1;
@@ -271,7 +340,7 @@ static Object *primitive_minus(Env *env, Object *args) {
 			if (args->cdr == Nil) {
 				diff = -diff;
 				break;
-			} 
+			}
 		} else {
 			diff -= args->car->value;
 		}
@@ -294,11 +363,44 @@ static Object *primitive_plus(Env *env, Object *args) {
 	return o;
 }
 
+static Object *primitive_println(Env *env, Object *args) {
+	if (count(args) != 1) {
+		err("println takes one argument only");
+	}
+	print(eval(env, args->car));
+	printf("\n");
+	return Nil;
+}
+
+static Object *primitive_progn(Env *env, Object *args) {
+	return progn(env, args);
+}
+
 static Object *primitive_quote(Env *env, Object *args) {
 	if (count(args) != 1) {
 		err("quote accepts one argument only");
 	}
 	return args->car;
+}
+
+static Object *primitive_while(Env *env, Object *args) {
+	if (count(args) < 2) {
+		err("while needs at least two arguments");
+	}
+	while (eval(env, args->car) != Nil) {
+		eval_args(env, args->cdr);
+	}
+	return Nil;
+}
+
+/**
+ * Composite primitives :)
+ */
+
+static Object *primitive_defun(Env *env, Object *args) {
+	Object *fn = primitive_lambda(env, args->cdr);
+	args->cdr = cons(fn, Nil);
+	return primitive_define(env, args);
 }
 
 /**
@@ -314,26 +416,36 @@ static void add_primitive(Env *env, char *name, Primitive *fn) {
 static Env *env_create() {
 	Env *env = (Env *) malloc(sizeof(Env));
 	env->ht = ht_create(128);
+	env->parent = NULL;
 	return env;
 }
 
 Env *env_init() {
 	Env *env = env_create();
+	ht_insert(env->ht, "Nil", Nil);
+	ht_insert(env->ht, "True", True);
 	add_primitive(env, "car", primitive_car);
 	add_primitive(env, "cdr", primitive_cdr);
 	add_primitive(env, "cons", primitive_cons);
+	add_primitive(env, "define", primitive_define);
+	add_primitive(env, "defun", primitive_defun);
+	add_primitive(env, "if", primitive_if);
+	add_primitive(env, "lambda", primitive_lambda);
 	add_primitive(env, "-", primitive_minus);
 	add_primitive(env, "+", primitive_plus);
+	add_primitive(env, "println", primitive_println);
+	add_primitive(env, "progn", primitive_progn);
 	add_primitive(env, "quote", primitive_quote);
+	add_primitive(env, "while", primitive_while);
 	return env;
 }
 
 static Object *env_lookup(Env *env, char *name) {
 	HashTableList *list = ht_lookup(env->ht, name);
-	if (list == NULL && env->parent != NULL) {
-		return env_lookup(env->parent, name);
-	}
 	if (list == NULL) {
+		if (env->parent) {
+			return env_lookup(env->parent, name);
+		}
 		printf("Undefined symbol: %s\n", name);
 		exit(1);
 	}

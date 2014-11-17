@@ -4,7 +4,12 @@
 int main(int argc, char *argv[]) {
 	Env *env = env_init();
 	for (;;) {
-		print(eval(env, read()));
+		Object *o = eval(env, read());
+		if (o == NULL) {
+			printf("\n");
+			return 0;
+		}
+		print(o);
 		printf("\n");
 	}
 	return 1;
