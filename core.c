@@ -7,7 +7,7 @@
 
 #define SYMBOL_MAX_LENGTH 128
 
-const char symbol_special_chars[] = "+-_"; // todo
+const char symbol_special_chars[] = "+-_<>=?";
 
 /**
  * PREDEFINED ATOMS
@@ -312,6 +312,28 @@ static Object *primitive_define(Env *env, Object *args) {
 	return value;
 }
 
+static Object *primitive_eq(Env *env, Object *args) {
+	if (count(args) != 2) {
+		err("= accepts two arguments only");
+	}
+	args = eval_args(env, args);
+	if (args->car->type != OT_INT || args->cdr->car->type != OT_INT) {
+		err("= accepts integers only");
+	}
+	return args->car->value == args->cdr->car->value ? True : Nil;
+}
+
+static Object *primitive_gt(Env *env, Object *args) {
+	if (count(args) != 2) {
+		err("> accepts two arguments only");
+	}
+	args = eval_args(env, args);
+	if (args->car->type != OT_INT || args->cdr->car->type != OT_INT) {
+		err("> accepts integers only");
+	}
+	return args->car->value > args->cdr->car->value ? True : Nil;
+}
+
 static Object *primitive_if(Env *env, Object *args) {
 	int cnt = count(args);
 	if (cnt != 2 && cnt != 3) {
@@ -321,6 +343,17 @@ static Object *primitive_if(Env *env, Object *args) {
 		return eval(env, args->cdr->car);
 	}
 	return cnt == 2 ? Nil : eval(env, args->cdr->cdr->car);
+}
+
+static Object *primitive_lt(Env *env, Object *args) {
+	if (count(args) != 2) {
+		err("< accepts two arguments only");
+	}
+	args = eval_args(env, args);
+	if (args->car->type != OT_INT || args->cdr->car->type != OT_INT) {
+		err("< accepts integers only");
+	}
+	return args->car->value < args->cdr->car->value ? True : Nil;
 }
 
 static Object *primitive_lambda(Env *env, Object *args) {
@@ -429,7 +462,10 @@ Env *env_init() {
 	add_primitive(env, "cons", primitive_cons);
 	add_primitive(env, "define", primitive_define);
 	add_primitive(env, "defun", primitive_defun);
+	add_primitive(env, "=", primitive_eq);
+	add_primitive(env, ">", primitive_gt);
 	add_primitive(env, "if", primitive_if);
+	add_primitive(env, "<", primitive_lt);
 	add_primitive(env, "lambda", primitive_lambda);
 	add_primitive(env, "-", primitive_minus);
 	add_primitive(env, "+", primitive_plus);
