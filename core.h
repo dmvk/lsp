@@ -4,6 +4,15 @@
 #include "hashtable.h"
 
 /**
+ * ENV
+ */
+
+typedef struct env_t {
+	HashTable *ht;
+	struct env_t *parent;
+} Env;
+
+/**
  * LIST STRUCTURED MEMORY
  */
 
@@ -19,7 +28,7 @@ typedef enum {
 
 struct object_t;
 
-typedef struct object_t *(Primitive)(struct object_t *args);
+typedef struct object_t *(Primitive)(Env *, struct object_t *);
 
 typedef struct object_t {
 	ObjectType type;
@@ -38,16 +47,9 @@ typedef struct object_t {
  * INTERFACE
  */
 
-HashTable *env_init();
+Env *env_init();
 Object *read();
-Object *eval(HashTable *, Object *);
+Object *eval(Env *, Object *);
 void print(Object *);
-
-/**
- * PREDEFINED ATOMS
- */
-
-extern Object *True;
-extern Object *Nil;
 
 #endif
