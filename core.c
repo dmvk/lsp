@@ -53,6 +53,7 @@ static void err(char *msg, ...) {
 static int peek();
 static Object *read_number();
 static Object *read_symbol();
+static Object *read_quoted_symbol();
 static Object *read_list();
 static Object *read_quote();
 
@@ -75,6 +76,9 @@ Object *read() {
 		if (isalpha(c) || strchr(symbol_special_chars, c)) {
 			ungetc(c, stdin);
 			return read_symbol();
+		}
+		if (c == '"') {
+			return read_quoted_symbol();
 		}
 		if (c == '(') {
 			return read_list();
@@ -111,6 +115,23 @@ static Object *read_symbol() {
 			err("Symbol name is too long");
 		}
 		buf[i++] = getchar();
+	}
+	buf[i] = '\0';
+	Object *o = new_object(OT_SYMBOL);
+	o->name = malloc(strlen(buf) + 1);
+	strcpy(o->name, buf);
+	return o;
+}
+
+static Object *read_quoted_symbol() {
+	char buf[SYMBOL_MAX_LENGTH + 1];
+	int i = 0;
+	int c;
+	while ((c = getchar()) != '"') {
+		if (i >= SYMBOL_MAX_LENGTH) {
+			err("Symbol name is too long");
+		}
+		buf[i++] = c;
 	}
 	buf[i] = '\0';
 	Object *o = new_object(OT_SYMBOL);
