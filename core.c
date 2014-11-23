@@ -7,7 +7,7 @@
 
 #define SYMBOL_MAX_LENGTH 128
 
-const char symbol_special_chars[] = "+-_<>=?";
+const char symbol_special_chars[] = "+-_<>=?*";
 
 /**
  * PREDEFINED ATOMS
@@ -422,6 +422,28 @@ static Object *primitive_minus(Env *env, Object *args) {
 	return o;
 }
 
+static Object *primitive_multi(Env *env, Object *args) {
+	if (count(args) < 2) {
+		err("* accepts at least two arguments");
+	}
+	int first = 1;
+	int total;
+	for (args = eval_args(env, args); args != Nil; args = args->cdr) {
+		if (args->car->type != OT_INT) {
+			err("* accepts only integers");
+		}
+		if (first) {
+			total = args->car->value;
+			first = 0;
+		} else {
+			total *= args->car->value;
+		}
+	}
+	Object *o = new_object(OT_INT);
+	o->value = total;
+	return o;
+}
+
 static Object *primitive_obj_eq(Env *env, Object *args) {
 	if (count(args) != 2) {
 		err("eq accepts two arguments only");
@@ -525,6 +547,7 @@ Env *env_init() {
 	add_primitive(env, "<", primitive_lt);
 	add_primitive(env, "lambda", primitive_lambda);
 	add_primitive(env, "-", primitive_minus);
+	add_primitive(env, "*", primitive_multi);
 	add_primitive(env, "eq", primitive_obj_eq);
 	add_primitive(env, "or", primitive_or);
 	add_primitive(env, "+", primitive_plus);
